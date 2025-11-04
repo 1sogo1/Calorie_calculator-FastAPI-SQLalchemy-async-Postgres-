@@ -12,45 +12,48 @@ meal_router = APIRouter(
 )
 
 
-@meal_router.post('/create_meal', response_model= MealSchema)
+@meal_router.post('/create_meal', response_model=MealSchema)
 async def create_meal(application: CreatMealSchema, db: AsyncSession = Depends(get_db)):
-  final_meal = {'calories': 0, 'protein': 0, 'fats': 0, 'carbs': 0}
-  for product_id_str, gramm in application.product_id_n_val.items():
-    try:
-      product_id = int(product_id_str) 
-    except ValueError:
-      raise HTTPException(status_code=400, detail=f"Invalid product_id: {product_id_str}")
+    nutrients = {
+        'calories': 0,
+        'protein': 0,
+        'fats': 0,
+        'carbs': 0
+    }
 
-    result = await db.execute(select(ProductTable).where(ProductTable.product_id == product_id))
-    product_to_use = result.scalars().first()
-
-    if not product_to_use:
-      raise HTTPException(status_code=404, detail='no product to use')
+    product_ids = [int(pid) for pid in application.product_id_n_val.keys()]
+    products_query = select(ProductTable).where(ProductTable.product_id.in_(product_ids))
+    products = dict(await db.execute(products_query))
     
-    rate = gramm / 100
+    for product_id, gramm in application.product_id_n_val.items():
+        product_id_int = int(product_id)
+        
+        if product_id_int not in products:
+            raise HTTPException(status_code=404, detail=f'Продукт не найден: {product_id}')
+            
+        product = products[product_id_int]
+        rate = gramm / 100
+        
+        nutrients['calories'] += int(product.calories * rate / application.portions)
+        nutrients['protein'] += product.protein * rate / application.portions
+        nutrients['fats'] += product.fats * rate / application.portions
+        nutrients['carbs'] += product.carbs * rate / application.portions
+    
+    meal = MealTable(
+        meal_name=application.meal_name,
+        **nutrients,
+        portions=application.portions
+    )
+    
+    try:
+        db.add(meal)
+        await db.commit()
+        await db.refresh(meal)
+        return meal
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=f'Ошибка при создании блюда: {str(e)}')
 
-    final_meal['calories'] += int(product_to_use.calories * rate / application.portions)
-    final_meal['protein'] += product_to_use.protein * rate / application.portions
-    final_meal['fats'] += product_to_use.fats * rate / application.portions
-    final_meal['carbs'] += product_to_use.carbs * rate / application.portions
-
-  go_to_db = MealTable(
-    meal_name = application.meal_name,
-    calories = int(final_meal['calories']),
-    protein = round(final_meal['protein'], 1),
-    fats = round(final_meal['fats'], 1),
-    carbs = round(final_meal['carbs'], 1),
-    portions = application.portions
-  )
-
-  db.add(go_to_db)
-  try:
-    await db.commit()
-    await db.refresh(go_to_db)
-    return go_to_db
-  except Exception as e:
-    await db.rollback()
-    raise HTTPException(status_code=400, detail=f'something went wrong: {str(e)}')
   
 
 @meal_router.get('/view')

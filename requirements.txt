@@ -4,4 +4,3 @@ sqlalchemy
 alembic
 asyncpg
 python-dotenv
-pidoras

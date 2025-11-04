@@ -22,7 +22,7 @@ class MealSchema(BaseModel):
   class Config:
     orm_mode = True
 
-class CreatMealSchema(BaseModel):
+class CreateMealSchema(BaseModel):
   meal_name: str = Field(..., min_length=1, max_length=50, description='Название блюда')
 
   product_id_n_val: Dict[str, int] = Field(

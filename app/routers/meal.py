@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
-from app.schemas import MealSchema, CreatMealSchema
+from app.schemas import MealSchema, CreateMealSchema
 from app.db import AsyncSession, get_db
 from app.models import MealTable, ProductTable
 from typing import Optional
@@ -13,7 +13,7 @@ meal_router = APIRouter(
 
 
 @meal_router.post('/create_meal', response_model=MealSchema)
-async def create_meal(application: CreatMealSchema, db: AsyncSession = Depends(get_db)):
+async def create_meal(application: CreateMealSchema, db: AsyncSession = Depends(get_db)):
     nutrients = {
         'calories': 0,
         'protein': 0,
